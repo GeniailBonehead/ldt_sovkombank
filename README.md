@@ -1,1 +1,0 @@
-# ldt_sovkombank

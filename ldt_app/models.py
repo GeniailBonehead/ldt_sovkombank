@@ -1,16 +1,28 @@
 from datetime import datetime
 
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import (
+    AbstractUser,
+    PermissionsMixin,
+)
+from django.core.validators import EmailValidator
 from django.db import models
 from django.contrib.auth.models import Group, Permission
 
 
-class CustomUser(AbstractUser):
-    """Пользователь"""
+class Profile(models.Model):
+    """Данные пользователя"""
     USER_GRADE_CHOICES = (
         ('Junior', 'Младший'),
         ('Middle', 'Средний'),
         ('Senjor', 'Старший'),
+    )
+    USER_STATUS_CHOICES = (
+        ('Active', 'На рабочем месте'),
+        ('Vacation', 'В отпуске'),
+        ('Ill', 'На больничном'),
+        ('Duty', 'В командировке'),
+        ('Other', 'Занимается другими задачами'),
     )
 
     grade = models.CharField(
@@ -18,8 +30,68 @@ class CustomUser(AbstractUser):
         max_length=30,
         choices=USER_GRADE_CHOICES,
     )
+    phone = models.CharField(
+        verbose_name='Номер телефона',
+        max_length=20,
+    )
+    email = models.EmailField(
+        verbose_name='email адрес',
+        blank=True,
+        validators=[EmailValidator]
+    )
+    lastname = models.CharField(
+        verbose_name='Фамилия',
+        max_length=50,
+        blank=False,
+    )
+    name = models.CharField(
+        verbose_name='Имя',
+        max_length=50,
+        blank=False,
+    )
+    patronymic = models.CharField(
+        verbose_name='Отчество',
+        max_length=50,
+        blank=False,
+    )
+    network = models.JSONField(
+        verbose_name='Соцсети',
+        blank=True,
+    )
+    active = models.CharField(
+        verbose_name='Статус сотрудника',
+        max_length=30,
+        choices=USER_STATUS_CHOICES,
+        default='Active',
+    )
+
+
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    """Пользователь"""
     groups = Group
     user_permissions = Permission
+
+    login = models.CharField(
+        verbose_name='Имя',
+        max_length=50,
+        blank=False,
+        unique=True,
+        default='admin',
+    )
+    token = models.CharField(
+        verbose_name='Токен',
+        max_length=50,
+        unique=True,
+        default='',
+    )
+    profile = models.OneToOneField(
+        Profile,
+        on_delete=models.CASCADE,
+        verbose_name='Данные пользователя',
+        blank=False,
+        default=1,
+    )
+    USERNAME_FIELD = "login"
 
 
 class Task(models.Model):
@@ -31,6 +103,7 @@ class Task(models.Model):
     TASK_STATUS_CHOICES = (
         ('FREE', 'Свободна'),
         ('TAKEN', 'В работе'),
+        ('ALARM', 'Форс-мажор'),
         ('FINISHED', 'Завершена'),
     )
     TASK_PRIORITY_CHOICES = (
@@ -39,15 +112,32 @@ class Task(models.Model):
         (3, 'Высокий'),
     )
 
-    start_dt = models.DateTimeField(
+    user_id = models.ForeignKey(
+        CustomUser,
+        verbose_name='Назначенный сотрудник',
+        null=True,
+        default=None,
+        on_delete=models.SET_DEFAULT,
+        db_index=True,
+    )
+    date_created = models.DateTimeField(
         verbose_name='Дата и время создания',
         default=datetime.now(),
     )
-    end_dt = models.DateTimeField(
+    date_finished = models.DateTimeField(
         verbose_name='Дата и время выполнения',
         null=True,
     )
-    type = models.CharField(
+    title = models.CharField(
+        verbose_name='Название',
+        max_length=50,
+        default='Задача',
+    )
+    description = models.TextField(
+        verbose_name='Описание задачи',
+        default='',
+    )
+    task_type = models.CharField(
         verbose_name='Тип задачи',
         max_length=30,
         choices=TASK_TYPE_CHOICES,
@@ -60,13 +150,6 @@ class Task(models.Model):
     priority = models.IntegerField(
         verbose_name='Приоритет',
         choices=TASK_PRIORITY_CHOICES,
-    )
-    assigned_user = models.ForeignKey(
-        CustomUser,
-        verbose_name='Назначенный сотрудник',
-        null=True,
-        default=None,
-        on_delete=models.SET_DEFAULT,
     )
 
 
@@ -109,4 +192,19 @@ class TaskHistory(models.Model):
         verbose_name='Дата и время изменения статуса',
         auto_now_add=True,
         help_text='Дата и время изменения статуса',
+    )
+
+
+class Gis(models.Model):
+    """Координаты пользователей"""
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+    )
+    lat = models.FloatField(
+        verbose_name='Широта',
+    )
+    long = models.FloatField(
+        verbose_name='Долгота',
     )

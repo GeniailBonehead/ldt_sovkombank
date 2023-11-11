@@ -2,12 +2,10 @@ from datetime import datetime
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import (
-    AbstractUser,
-    PermissionsMixin,
+    Group, Permission, PermissionsMixin, User, UserManager,
 )
 from django.core.validators import EmailValidator
 from django.db import models
-from django.contrib.auth.models import Group, Permission
 
 
 class Profile(models.Model):
@@ -25,6 +23,12 @@ class Profile(models.Model):
         ('Other', 'Занимается другими задачами'),
     )
 
+    user = models.OneToOneField(
+        User,
+        verbose_name='Учётные данные пользователя',
+        on_delete=models.CASCADE,
+        default=-1,
+    )
     grade = models.CharField(
         verbose_name='Уровень',
         max_length=30,
@@ -33,11 +37,6 @@ class Profile(models.Model):
     phone = models.CharField(
         verbose_name='Номер телефона',
         max_length=20,
-    )
-    email = models.EmailField(
-        verbose_name='email адрес',
-        blank=True,
-        validators=[EmailValidator]
     )
     lastname = models.CharField(
         verbose_name='Фамилия',
@@ -64,34 +63,12 @@ class Profile(models.Model):
         choices=USER_STATUS_CHOICES,
         default='Active',
     )
-
-
-class CustomUser(AbstractBaseUser, PermissionsMixin):
-    """Пользователь"""
-    groups = Group
-    user_permissions = Permission
-
-    login = models.CharField(
-        verbose_name='Имя',
-        max_length=50,
-        blank=False,
-        unique=True,
-        default='admin',
-    )
     token = models.CharField(
         verbose_name='Токен',
         max_length=50,
         unique=True,
         default='',
     )
-    profile = models.OneToOneField(
-        Profile,
-        on_delete=models.CASCADE,
-        verbose_name='Данные пользователя',
-        blank=False,
-        default=1,
-    )
-    USERNAME_FIELD = "login"
 
 
 class Task(models.Model):
@@ -112,8 +89,8 @@ class Task(models.Model):
         (3, 'Высокий'),
     )
 
-    user_id = models.ForeignKey(
-        CustomUser,
+    user = models.ForeignKey(
+        User,
         verbose_name='Назначенный сотрудник',
         null=True,
         default=None,
@@ -165,7 +142,7 @@ class TaskHistory(models.Model):
     )
 
     user = models.ForeignKey(
-        CustomUser,
+        User,
         null=True,
         blank=True,
         on_delete=models.PROTECT,
@@ -199,7 +176,7 @@ class Gis(models.Model):
     """Координаты пользователей"""
 
     user = models.ForeignKey(
-        CustomUser,
+        User,
         on_delete=models.CASCADE,
     )
     lat = models.FloatField(

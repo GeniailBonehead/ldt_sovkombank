@@ -20,7 +20,20 @@ class Application:
 
     def count_task(self):
         """Обращение к ML"""
-        return count_mock(self.tasks, self.users)
+        self.preprocess_data()
+        result = count_mock(self.tasks, self.users)
+        result = self.postprocess_data(result)
+        return result
+
+    def preprocess_data(self):
+        pass
+
+    def postprocess_data(self, data):
+        return data
+
+    def clean_data(self):
+        """Использование внешних сервисов для очистки данных"""
+        pass
 
 
 def count_mock(tasks, users):

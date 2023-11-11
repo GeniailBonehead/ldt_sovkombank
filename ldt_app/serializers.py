@@ -1,7 +1,9 @@
+from datetime import datetime
+
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from ldt_app.models import (
-    CustomUser,
     Profile,
     Task,
     TaskHistory,
@@ -32,6 +34,15 @@ class TaskSerializer(serializers.Serializer):
         instance.task_type = validated_data.get('type', instance.task_type)
         instance.status = validated_data.get('status', instance.status)
         instance.priority = validated_data.get('start_dt', instance.priority)
+        task = Task.objects.get(validated_data.get('id'))
+        request = self.context.get("request")
+        user = None
+        if request and hasattr(request, "user"):
+            user = request.user
+        if not user:
+            return
+        if task.status != instance.status:
+            TaskHistory.objects.create(task, user, task.status, instance.status, datetime.now)
         instance.save()
         return instance
 
@@ -54,7 +65,7 @@ class ProfileSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         """Обновление профиля"""
-        instance.user_id = validated_data.get('user_id', instance.user_id)
+        instance.user = validated_data.get('user_id', instance.user)
         instance.grade = validated_data.get('grade', instance.grade)
         instance.email = validated_data.get('email', instance.email)
         instance.phone = validated_data.get('phone', instance.phone)
@@ -64,16 +75,22 @@ class ProfileSerializer(serializers.Serializer):
         instance.network = validated_data.get('network', instance.network)
 
 
-class UserSerializer(serializers.Serializer):
-    """Сериалайзер учётной записи"""
+UserModel = get_user_model()
 
-    id = serializers.IntegerField()
-    login = serializers.CharField()
+
+class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     def create(self, validated_data):
-        """Создание нового профиля"""
-        return CustomUser.objects.create(**validated_data)
+        user = UserModel.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password'],
+        )
+        return user
+
+    class Meta:
+        model = UserModel
+        fields = ("id", "username", "password")
 
 
 class TaskHistorySerializer(serializers.Serializer):

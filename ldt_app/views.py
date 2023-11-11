@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate, login, logout
@@ -19,6 +20,11 @@ from .serializers import (
 )
 
 
+def rights_check(func, role):
+    """Инкапсуляция проверки прав"""
+    return func()
+
+
 def index(request):
     return HttpResponse('Главная страница')
 
@@ -26,12 +32,14 @@ def index(request):
 def profile_data(request, pk):
     """Получить данные по пользователю"""
     try:
-        profile = Profile.objects.get(pk=pk)
+        profile = Profile.objects.select_related('user').get(pk=pk)
     except Profile.DoesNotExist:
         return HttpResponse(status=404)
 
     if request.method == 'GET':
         serializer = ProfileSerializer(profile)
+        data = serializer.data
+        data['login'] = profile.user.login
         return JsonResponse(serializer.data)
 
     elif request.method == 'POST':
@@ -84,7 +92,7 @@ def tasks(request):
     elif request.method == 'POST':
         data = JSONParser().parse(request)
         serializer = TaskSerializer(data=data)
-        if serializer.is_valid():
+        if serializer and serializer.is_valid():
             serializer.save()
             return JsonResponse(serializer.data, status=201)
         return JsonResponse(serializer.errors, status=400)
